@@ -5,6 +5,8 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import EventIcon from '@mui/icons-material/Event';
+import PriorityToggle from './PriorityToggle';
+import { applyStoredPriorities, storePriority } from './priority';
 
 function TaskList({ onEdit }) {
   const [tasks, setTasks] = useState([]);
@@ -33,7 +35,7 @@ function TaskList({ onEdit }) {
       const response = await fetch('/api/tasks');
       if (!response.ok) throw new Error('Failed to fetch tasks');
       const data = await response.json();
-      setTasks(data);
+      setTasks(applyStoredPriorities(data));
       setError(null);
     } catch (err) {
       setError(err.message);
@@ -62,6 +64,11 @@ function TaskList({ onEdit }) {
     } catch (err) {
       setError('Failed to delete task');
     }
+  };
+
+  const handlePriorityChange = (task, priority) => {
+    if (!storePriority(task, priority)) return;
+    setTasks(current => current.map(t => (t.id === task.id ? { ...t, priority } : t)));
   };
 
   if (loading) return (
@@ -127,7 +134,8 @@ function TaskList({ onEdit }) {
           <ListItem 
             key={task.id} 
             sx={{ 
-              pr: 18,
+              flexWrap: 'wrap',
+              rowGap: 1,
               py: 1,
               mb: 1,
               borderRadius: 2,
@@ -193,10 +201,8 @@ function TaskList({ onEdit }) {
             />
             <Box 
               sx={{ 
-                position: 'absolute', 
-                right: 8,
-                top: '50%',
-                transform: 'translateY(-50%)',
+                ml: 'auto',
+                flexShrink: 0,
                 display: 'flex',
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -220,6 +226,11 @@ function TaskList({ onEdit }) {
                   }}
                 />
               )}
+              <PriorityToggle
+                taskTitle={task.title}
+                value={task.priority}
+                onChange={priority => handlePriorityChange(task, priority)}
+              />
               <Box 
                 sx={{ 
                   display: 'flex', 
