@@ -14,6 +14,10 @@ app.use(morgan('dev'));
 // Initialize in-memory SQLite database
 const db = new Database(':memory:');
 
+const PRIORITIES = ['P1', 'P2', 'P3'];
+const DEFAULT_PRIORITY = 'P3';
+const isInvalidPriority = priority => priority !== undefined && !PRIORITIES.includes(priority);
+
 /*
 TODO TASK DATA MODEL & ENDPOINT PLAN
 
@@ -23,6 +27,7 @@ Table: tasks
   - description TEXT
   - due_date DATE
   - completed BOOLEAN DEFAULT 0
+  - priority TEXT NOT NULL DEFAULT 'P3' (P1, P2, P3)
   - created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 
 Endpoints to implement:
@@ -47,6 +52,7 @@ db.exec(`
     description TEXT,
     due_date DATE,
     completed BOOLEAN DEFAULT 0,
+    priority TEXT NOT NULL DEFAULT 'P3' CHECK (priority IN ('P1', 'P2', 'P3')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )
 `);
@@ -91,12 +97,17 @@ app.get('/api/tasks', (req, res) => {
 // POST /api/tasks (create)
 app.post('/api/tasks', (req, res) => {
   try {
-    const { title, description, due_date } = req.body;
+    const { title, description, due_date, priority } = req.body;
     if (!title || typeof title !== 'string' || title.trim() === '') {
       return res.status(400).json({ error: 'Task title is required' });
     }
-    const stmt = db.prepare('INSERT INTO tasks (title, description, due_date) VALUES (?, ?, ?)');
-    const result = stmt.run(title, description || '', due_date || null);
+    if (isInvalidPriority(priority)) {
+      return res.status(400).json({ error: 'Priority must be one of P1, P2, P3' });
+    }
+    const stmt = db.prepare(
+      'INSERT INTO tasks (title, description, due_date, priority) VALUES (?, ?, ?, ?)'
+    );
+    const result = stmt.run(title, description || '', due_date || null, priority ?? DEFAULT_PRIORITY);
     const newTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(result.lastInsertRowid);
     res.status(201).json(newTask);
   } catch (error) {
@@ -120,12 +131,24 @@ app.get('/api/tasks/:id', (req, res) => {
 // PUT /api/tasks/:id (edit)
 app.put('/api/tasks/:id', (req, res) => {
   try {
-    const { title, description, due_date } = req.body;
+    const { title, description, due_date, priority } = req.body;
     if (!title || typeof title !== 'string' || title.trim() === '') {
       return res.status(400).json({ error: 'Task title is required' });
     }
-    const stmt = db.prepare('UPDATE tasks SET title = ?, description = ?, due_date = ? WHERE id = ?');
-    const result = stmt.run(title, description || '', due_date || null, req.params.id);
+    if (isInvalidPriority(priority)) {
+      return res.status(400).json({ error: 'Priority must be one of P1, P2, P3' });
+    }
+    // A missing priority keeps the task's current one.
+    const stmt = db.prepare(
+      'UPDATE tasks SET title = ?, description = ?, due_date = ?, priority = COALESCE(?, priority) WHERE id = ?'
+    );
+    const result = stmt.run(
+      title,
+      description || '',
+      due_date || null,
+      priority ?? null,
+      req.params.id
+    );
     if (result.changes === 0) return res.status(404).json({ error: 'Task not found' });
     const updatedTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
     res.json(updatedTask);

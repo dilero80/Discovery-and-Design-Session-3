@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import React, { act } from 'react';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -63,7 +65,6 @@ const server = setupServer(
 
 // Setup and teardown for the mock server
 beforeAll(() => server.listen());
-beforeEach(() => localStorage.clear());
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 
@@ -154,20 +155,24 @@ describe('TODO App', () => {
 });
 
 describe('Task priority', () => {
-  const STORAGE_KEY = 'taskPriorities';
-  const createdAt = '2025-09-01 10:00:00';
   const tasks = [
-    { id: 1, title: 'Task A', description: '', due_date: null, completed: 0, created_at: createdAt },
-    { id: 2, title: 'Task B', description: '', due_date: null, completed: 0, created_at: createdAt },
+    {
+      id: 1,
+      title: 'Task A',
+      description: 'Desc A',
+      due_date: '2025-09-30',
+      completed: 0,
+      priority: 'P3',
+    },
+    { id: 2, title: 'Task B', description: '', due_date: null, completed: 0, priority: 'P1' },
   ];
 
-  const renderApp = async (list = tasks) => {
+  const renderApp = async () => {
     server.use(
-      rest.get('/api/tasks', (req, res, ctx) => res(ctx.status(200), ctx.json(list)))
+      rest.get('/api/tasks', (req, res, ctx) => res(ctx.status(200), ctx.json(tasks)))
     );
-    const view = render(<App />);
-    await screen.findByText(list[0].title);
-    return view;
+    render(<App />);
+    await screen.findByText('Task A');
   };
 
   const priorityButton = (title, priority) =>
@@ -184,81 +189,72 @@ describe('Task priority', () => {
     });
   };
 
-  test('selects P3 for tasks without a stored priority', async () => {
+  test('shows each task priority returned by the API', async () => {
     await renderApp();
 
     expectSelected('Task A', 'P3');
-    expectSelected('Task B', 'P3');
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY))).toEqual({
-      [`1:${createdAt}`]: 'P3',
-      [`2:${createdAt}`]: 'P3',
-    });
+    expectSelected('Task B', 'P1');
   });
 
-  test('selects one priority at a time and keeps it after a reload', async () => {
-    const user = userEvent.setup();
-    const view = await renderApp();
-
-    await user.click(priorityButton('Task A', 'P1'));
-    expectSelected('Task A', 'P1');
-    await user.click(priorityButton('Task A', 'P2'));
-    expectSelected('Task A', 'P2');
-    expectSelected('Task B', 'P3');
-
-    view.unmount();
-    await renderApp();
-
-    expectSelected('Task A', 'P2');
-    expectSelected('Task B', 'P3');
-  });
-
-  test('keeps the priority selected when it is clicked again', async () => {
-    const user = userEvent.setup();
-    await renderApp();
-
-    await user.click(priorityButton('Task A', 'P1'));
-    await user.click(priorityButton('Task A', 'P1'));
-
-    expectSelected('Task A', 'P1');
-  });
-
-  test('shows unselected buttons in gray and the selected button in blue', async () => {
-    const user = userEvent.setup();
-    await renderApp();
-
-    await user.click(priorityButton('Task A', 'P2'));
-
-    expect(priorityButton('Task A', 'P2')).toHaveStyle({ backgroundColor: '#07F2E6' });
-    expect(priorityButton('Task A', 'P1')).toHaveStyle({ backgroundColor: '#7A7A7A' });
-    expect(priorityButton('Task A', 'P3')).toHaveStyle({ backgroundColor: '#7A7A7A' });
-  });
-
-  test('gives a newly created task priority P3', async () => {
-    let list = [...tasks];
+  test('sends a PUT with the new priority and selects one priority at a time', async () => {
+    let put;
     server.use(
-      rest.get('/api/tasks', (req, res, ctx) => res(ctx.status(200), ctx.json(list))),
-      rest.post('/api/tasks', (req, res, ctx) => {
-        const newTask = {
-          id: 3,
-          title: req.body.title,
-          description: '',
-          due_date: null,
-          completed: 0,
-          created_at: '2025-09-02 08:00:00',
-        };
-        list = [...list, newTask];
-        return res(ctx.status(201), ctx.json(newTask));
+      rest.put('/api/tasks/:id', (req, res, ctx) => {
+        put = { id: req.params.id, body: req.body };
+        return res(ctx.status(200), ctx.json({ ...req.body, id: Number(req.params.id) }));
       })
     );
     const user = userEvent.setup();
-    render(<App />);
-    await screen.findByText('Task A');
+    await renderApp();
 
-    await user.type(screen.getByTestId('title-input'), 'New Task');
-    await user.click(screen.getByTestId('submit-task'));
-    await screen.findByText('New Task');
+    await user.click(priorityButton('Task A', 'P1'));
 
-    expectSelected('New Task', 'P3');
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY))['3:2025-09-02 08:00:00']).toBe('P3');
+    await waitFor(() => expectSelected('Task A', 'P1'));
+    expect(put).toEqual({
+      id: '1',
+      body: { title: 'Task A', description: 'Desc A', due_date: '2025-09-30', priority: 'P1' },
+    });
+    expectSelected('Task B', 'P1');
+  });
+
+  test('does not send a request when the selected priority is clicked again', async () => {
+    const onPut = jest.fn();
+    server.use(
+      rest.put('/api/tasks/:id', (req, res, ctx) => {
+        onPut();
+        return res(ctx.status(200), ctx.json({}));
+      })
+    );
+    const user = userEvent.setup();
+    await renderApp();
+
+    await user.click(priorityButton('Task A', 'P3'));
+
+    expectSelected('Task A', 'P3');
+    expect(onPut).not.toHaveBeenCalled();
+  });
+
+  test('shows an error when the priority update fails', async () => {
+    server.use(
+      rest.put('/api/tasks/:id', (req, res, ctx) =>
+        res(ctx.status(400), ctx.json({ error: 'Priority must be one of P1, P2, P3' }))
+      )
+    );
+    const user = userEvent.setup();
+    await renderApp();
+
+    await user.click(priorityButton('Task A', 'P1'));
+
+    expect(await screen.findByText('Failed to update priority')).toBeInTheDocument();
+  });
+
+  // Jest does not load CSS, so the sketch colors are checked in the stylesheet itself.
+  test('styles priority buttons gray when unselected and blue when selected', async () => {
+    await renderApp();
+    const css = fs.readFileSync(path.join(__dirname, '..', 'App.css'), 'utf8');
+
+    expect(priorityButton('Task A', 'P1')).toHaveClass('priority-button');
+    expect(css).toMatch(/\.priority-button\s*\{[^}]*background-color:\s*#7A7A7A/);
+    expect(css).toMatch(/\.priority-button\.Mui-selected[^{]*\{[^}]*background-color:\s*#07F2E6/);
   });
 });

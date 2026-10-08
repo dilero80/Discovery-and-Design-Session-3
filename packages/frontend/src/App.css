@@ -37,43 +37,23 @@ section {
   margin-top: 10px;
 }
 
-input {
-  flex: 1;
-  padding: 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+/* Priority buttons act like radio buttons: gray when unselected, blue when selected. */
+.priority-toggle .priority-button {
+  min-width: 48px;
+  min-height: 48px;
+  font-weight: 600;
+  color: #ffffff;
+  background-color: #7A7A7A;
 }
 
-button {
-  padding: 8px 16px;
-  background-color: #61dafb;
-  color: #282c34;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: bold;
+.priority-toggle .priority-button:hover {
+  background-color: #7A7A7A;
 }
 
-button:hover {
-  background-color: #21a1c9;
-}
-
-ul {
-  list-style-type: none;
-  padding: 0;
-}
-
-li {
-  padding: 10px;
-  border-bottom: 1px solid #ddd;
-  text-align: left;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-li:last-child {
-  border-bottom: none;
+.priority-toggle .priority-button.Mui-selected,
+.priority-toggle .priority-button.Mui-selected:hover {
+  color: #212121;
+  background-color: #07F2E6;
 }
 
 .delete-btn {

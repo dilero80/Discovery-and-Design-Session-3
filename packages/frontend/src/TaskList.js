@@ -6,9 +6,8 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import EventIcon from '@mui/icons-material/Event';
 import PriorityToggle from './PriorityToggle';
-import { applyStoredPriorities, storePriority } from './priority';
 
-function TaskList({ onEdit }) {
+function TaskList({ onEdit, onPriorityChange }) {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -35,7 +34,7 @@ function TaskList({ onEdit }) {
       const response = await fetch('/api/tasks');
       if (!response.ok) throw new Error('Failed to fetch tasks');
       const data = await response.json();
-      setTasks(applyStoredPriorities(data));
+      setTasks(data);
       setError(null);
     } catch (err) {
       setError(err.message);
@@ -66,9 +65,13 @@ function TaskList({ onEdit }) {
     }
   };
 
-  const handlePriorityChange = (task, priority) => {
-    if (!storePriority(task, priority)) return;
-    setTasks(current => current.map(t => (t.id === task.id ? { ...t, priority } : t)));
+  const handlePriorityChange = async (task, priority) => {
+    try {
+      await onPriorityChange(task, priority);
+      setTasks(current => current.map(t => (t.id === task.id ? { ...t, priority } : t)));
+    } catch (err) {
+      setError('Failed to update priority');
+    }
   };
 
   if (loading) return (

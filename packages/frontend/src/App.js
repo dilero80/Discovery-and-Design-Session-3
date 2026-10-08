@@ -3,6 +3,7 @@ import { CssBaseline, Container, AppBar, Toolbar, Typography, Box } from '@mui/m
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import TaskList from './TaskList';
 import TaskForm from './TaskForm';
+import './App.css';
 
 function App() {
   const [editingTask, setEditingTask] = useState(null);
@@ -26,6 +27,20 @@ function App() {
       });
     }
     setRefreshKey(k => k + 1);
+  };
+
+  const handlePriorityChange = async (task, priority) => {
+    const response = await fetch(`/api/tasks/${task.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: task.title,
+        description: task.description,
+        due_date: task.due_date,
+        priority,
+      }),
+    });
+    if (!response.ok) throw new Error('Failed to update priority');
   };
 
   return (
@@ -72,7 +87,11 @@ function App() {
             <TaskForm onSave={handleSave} initialTask={editingTask} />
           </Box>
           <Box sx={{ flexGrow: 1, minHeight: 0, overflow: 'hidden' }}>
-            <TaskList key={refreshKey} onEdit={setEditingTask} />
+            <TaskList
+              key={refreshKey}
+              onEdit={setEditingTask}
+              onPriorityChange={handlePriorityChange}
+            />
           </Box>
         </Container>
       </Box>
