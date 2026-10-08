@@ -1,0 +1,188 @@
+## MVP
+
+- Epic: Task Planning and Prioritization
+  - Story: Give every task a title
+    - Acceptance Criteria:
+      - Given a user supplies a title for an otherwise valid task, when the user creates the task, then the task is accepted with that title.
+      - Given a user supplies no task title, when the user attempts to create the task, then the task is not accepted without a title.
+    - Technical Requirements:
+      - Frontend: Reuse TaskForm's controlled MUI title field, submit callback, and inline error presentation. Keep the existing nonblank-title check for creation and editing; no new title length limit or text transformation is specified.
+      - Data and validation: Enforce a required title at the shared local task-write boundary as well as in the form, so a caller cannot bypass validation. Preserve the supplied title after validation and retain unrelated task fields.
+      - Backend and API: No backend or HTTP contract changes. The existing POST and PUT handlers already validate titles, but the local-only flow must enforce the rule without depending on them. The frontend save contract must distinguish validation failure from a successful write.
+      - Errors: Use the existing inline error pattern for missing titles. Engineering safeguard: retain entered form values when validation or storage fails and do not report a successful save.
+      - Security and integrations: Keep titles rendered as React text rather than executable markup. No authentication, authorization roles, or external integrations are introduced.
+      - Observability: No new logging, monitoring, or audit requirement is specified. Do not introduce external telemetry or log task titles; existing backend logging remains unchanged.
+      - Verification: Extend the existing Jest and React Testing Library coverage for successful creation, missing titles, the existing whitespace-only check, and failure without form reset. Exercise local-write validation independently of the UI.
+  - Story: Retain each task's completion status
+    - Acceptance Criteria:
+      - Given an existing completed task, when a due date or priority is assigned, then the task remains completed.
+      - Given an existing incomplete task, when a due date or priority is assigned, then the task remains incomplete.
+    - Technical Requirements:
+      - Frontend: Reuse App's editingTask state, TaskForm's initialTask flow, and TaskList's checkbox. Metadata saves must update the existing task rather than recreate it or apply new-task defaults to its completion status.
+      - Data and validation: Preserve task identity and completion status when merging due-date or priority changes. Existing API records use completed values of 0 or 1, whereas the completion update payload is boolean; keep a consistent frontend representation and explicitly normalize legacy values at the data boundary.
+      - Backend and API: No backend changes or new HTTP contracts. Existing PUT updates do not change completion, and PATCH handles completion separately; preserve that separation in the local update contract.
+      - Errors: Engineering safeguard: failed metadata writes must not change the stored completion status or be presented as successful edits.
+      - Security and integrations: Do not introduce ownership fields, authorization flows, or remote synchronization. Route updates through the same validated local task boundary as other stories.
+      - Observability: No new completion audit trail or external monitoring is required; do not add either as part of this story.
+      - Verification: Cover completed and incomplete tasks, both metadata fields, stable identity, and retained completion after storage reload using the existing frontend test tools and a mocked local store.
+  - Story: Set an optional task due date
+    - Acceptance Criteria:
+      - Given a user supplies a valid calendar date in YYYY-MM-DD format, when the date is assigned to a task, then the task has that due date.
+      - Given a user supplies no due date, when an otherwise valid task is created, then the task is accepted without a due date.
+    - Technical Requirements:
+      - Frontend: Reuse TaskForm's controlled MUI date input and edit initialization, and TaskList's existing date display. Creation and editing must carry the optional date through the save callback and local task state.
+      - Data and validation: Use the PRD's dueDate field as a date-only YYYY-MM-DD value, without adding a timestamp or implicit timezone conversion. Define one consistent representation for an absent date across the form, local task contract, and persistence.
+      - Compatibility: The current form, list, API, and tests use due_date. Provide an explicit frontend boundary mapping if existing records are retained; avoid competing date fields in active task state. Migration of backend records into local storage is not specified and needs confirmation.
+      - Backend and API: No schema or endpoint changes. The existing HTTP due_date contract remains unchanged; the local-only flow must not require an extended backend contract.
+      - Errors: Invalid date handling belongs to the invalid-date story; leaving the field empty must not trigger required-date validation. Engineering safeguard: a storage failure must not clear the user's date input as if saving succeeded.
+      - Security, integrations, and observability: Validate date values at the local boundary; no remote date service, new authorization flow, date logging, or audit history is required.
+      - Verification: Cover valid date assignment, empty dates, edit initialization, displayed dates, and date-only round trips through the selected local persistence mechanism.
+  - Story: Treat invalid task due dates as absent
+    - Acceptance Criteria:
+      - Given an otherwise valid task with a due date that is not in YYYY-MM-DD format, when the user creates the task, then the task is accepted with the invalid value ignored and no due date.
+      - Given an otherwise valid task with an impossible calendar date such as 2026-02-30, when the user creates the task, then the task is accepted with the invalid value ignored and no due date.
+      - Given an otherwise valid task with a valid calendar date in YYYY-MM-DD format, when the user creates the task, then the task is accepted with that due date retained rather than ignored.
+    - Technical Requirements:
+      - Frontend: Replace reliance on TaskForm's permissive date normalization with a reusable date-validation contract shared by task writes and date-consuming views. Native date-input validation alone is insufficient for values supplied outside the form.
+      - Data and validation: Verify the exact YYYY-MM-DD shape and calendar validity, including month lengths and leap years. Do not coerce malformed values or allow date-parser rollover to turn an impossible date into a different valid date.
+      - Persistence: Normalize invalid input to the agreed absent-date representation before storage and when interpreting stored date values. Keep valid dates unchanged and preserve the remaining valid task data.
+      - Backend and API: No backend validation or HTTP changes. The existing backend accepts due_date without calendar validation, so it cannot be the enforcement point for the local-only implementation.
+      - Errors: Invalid dates are ignored, not a reason to reject an otherwise valid task. No warning text is prescribed. Storage failures remain distinct from this successful normalization behavior.
+      - Security, integrations, and observability: Treat persisted values as untrusted input and validate their types before parsing. No external validation service, authentication extension, invalid-input audit trail, or task-payload logging is required.
+      - Verification: Add focused tests for malformed strings, impossible dates, valid and invalid leap days, absent values, valid date preservation, and task acceptance after invalid-date normalization.
+  - Story: Choose a task priority of P1, P2, or P3
+    - Acceptance Criteria:
+      - Given a user selects P1, P2, or P3, when the priority is assigned to a task, then the task has the selected priority; this holds for each of the three values.
+      - Given a priority value outside P1, P2, and P3, when it is supplied for a task, then that value is not accepted as the task's priority.
+    - Technical Requirements:
+      - Frontend: Extend the existing controlled MUI form with a priority selection limited to P1, P2, and P3. Initialize it from the edited task and include the selected value in the existing save callback pattern.
+      - Data and validation: Add priority to the local task contract and validate enum membership at the write boundary, not only in the control. Save and reload the selected value without changing completion, identity, or other task data.
+      - Backend and API: No backend or HTTP changes. The existing SQLite schema and create/edit handlers do not store priority; therefore, priority must be handled by the local task path rather than by adding fields to backend requests and assuming they persist.
+      - Errors and decisions: An unsupported value cannot become the stored priority. The PRD does not specify rejection versus fallback for invalid values or recovery for corrupt stored priorities; confirm that policy before implementation. Reuse inline errors if rejection is chosen.
+      - Design scope: Priority badge colors have unresolved release scope and are not an implementation requirement for this story.
+      - Security, integrations, and observability: Validate values from both forms and storage. No role-based priority permissions, external priority integration, or priority-change audit system is required.
+      - Verification: Cover selection and persistence of all three values, edit initialization, invalid enum values, and preservation of unrelated task fields using existing frontend test patterns.
+  - Story: Start tasks with P3 priority by default
+    - Acceptance Criteria:
+      - Given a user supplies no priority, when an otherwise valid task is created, then its priority is P3.
+      - Given a user explicitly selects P1, P2, or P3, when an otherwise valid task is created, then the selected priority is retained instead of being replaced by the default.
+    - Technical Requirements:
+      - Frontend: Initialize the create-task priority field to P3 and reset it to P3 after a successful creation. Editing must initialize from the task's selected priority instead of unconditionally applying the create default.
+      - Data and validation: Apply P3 when a new task's local-write input omits priority. Explicit valid values take precedence. Keep missing-value defaulting separate from the unresolved invalid-value recovery policy.
+      - Compatibility and decisions: Existing records have no priority. Confirm whether and how they receive P3 when adopted into local storage; the PRD specifies the default but does not define an existing-data migration process.
+      - Backend and API: No backend changes or server default are required. The frontend local-create contract must guarantee the default independently of form initialization.
+      - Errors: Engineering safeguard: unsuccessful saves must not reset a user's explicit priority selection. Do not use P3 to silently mask storage-write failures.
+      - Security, integrations, and observability: Use the same enum validation boundary as priority selection; no new authorization, external integration, logging, or audit requirements apply.
+      - Verification: Cover omitted priority, explicit P1/P2/P3, form reset after successful creation, editing without default overwrite, and failed-save retention.
+- Epic: Focused Task Views
+  - Story: Switch between All, Today, and Overdue tabs
+    - Acceptance Criteria:
+      - Given a user is viewing the task list, when the available view tabs are displayed, then All, Today, and Overdue are available.
+      - Given the view tabs are available, when the user selects All, Today, or Overdue, then the corresponding view is shown; this holds for each tab.
+      - Given any of the three views is selected, when the user selects another view's tab, then the task list follows the newly selected view's completion-status rules.
+    - Technical Requirements:
+      - Frontend: Add All, Today, and Overdue tabs using the existing MUI component library. Use the current React hook and prop/callback patterns for selected-view state and list updates; the application has no router or global state library, and neither is required for these views.
+      - State and contracts: Derive the displayed collection from one complete local task collection and the selected view. Do not overwrite stored tasks with filtered results. Ensure App's current refreshKey remount pattern does not unintentionally discard an active view during task updates.
+      - Business rules and decisions: All permits both completion states; Today and Overdue exclude completed tasks. Initial selected view, view-state persistence, date boundaries, timezone rules, and undated-task behavior are unspecified; do not introduce them as confirmed product rules.
+      - Backend and API: No new endpoints, query parameters, or backend changes. The existing completed/search query support is not a substitute for these local date-based views.
+      - Errors: Reuse TaskList's empty and error presentation patterns where applicable. Engineering safeguard: a storage-read error must remain distinguishable from a successfully loaded view with no matching tasks.
+      - Security, integrations, and observability: Switching views must not send task data to remote services. No authentication, route permissions, tab-use analytics, or audit events are required.
+      - Verification: Extend App interaction tests for all tabs, view transitions, completion exclusions, updates while a view is active, and empty versus failed-load behavior.
+  - Story: See completed and incomplete tasks in All
+    - Acceptance Criteria:
+      - Given the task list contains completed and incomplete tasks, when the user selects All, then both completed and incomplete tasks are shown.
+      - Given a completed task is excluded from Today or Overdue, when the user switches to All, then that completed task is shown.
+    - Technical Requirements:
+      - Frontend: Reuse TaskList's list items, completion checkbox, edit/delete callbacks, completed styling, and empty-state presentation. The All selector must not remove tasks based on completion status.
+      - State and persistence: Read from the complete local task collection, not the previously filtered Today or Overdue result. Changing to All must not alter task data or completion flags.
+      - Backend and API: No backend or HTTP changes; All must work from local data without a new completion-filter request.
+      - Validation and errors: Interpret completion consistently with the shared local model, including any supported legacy 0/1 values. Reuse shared load-error handling rather than treating failures as an empty All result.
+      - Security and integrations: Retain React's text rendering for task content; no new authorization rules or external services are required.
+      - Observability: No view-specific logging, monitoring, or audit requirement is documented; do not introduce remote analytics.
+      - Verification: Cover mixed completion states, collections containing only one completion state, an empty collection, and returning from each filtered view without losing completed tasks.
+  - Story: See only incomplete tasks in Today
+    - Acceptance Criteria:
+      - Given an incomplete task qualifies for Today, when the user selects Today, then that task is shown.
+      - Given a completed task, when the user selects Today, then that task is not shown.
+      - Given no incomplete tasks qualify for Today, when the user selects Today, then no tasks are shown in that view.
+    - Technical Requirements:
+      - Frontend: Add a Today selector over the shared task collection and reuse TaskList rendering. Combine the agreed Today date classification with the incomplete-task rule; recalculate displayed membership when task data changes.
+      - Business rules and decisions: Exclude completed tasks even if they meet the Today date classification. The PRD leaves date boundaries, timezone handling, and undated-task membership unresolved; these decisions are required before final date-comparison behavior and its tests can be specified.
+      - Data and persistence: Use the shared date validator and completion representation. Filtering must not modify stored dates, remove tasks, or persist a reduced task collection.
+      - Backend and API: No backend changes or Today endpoint. Classification and filtering belong to the local frontend data flow.
+      - Errors: Reuse the existing empty-list presentation when no incomplete tasks qualify. Invalid dates follow the absent-date rule; their view membership awaits the undated-task decision. Keep storage errors separate from empty results.
+      - Security, integrations, and observability: No external clock/date service, notification integration, authorization extension, analytics, or audit log is required.
+      - Verification: Cover qualifying incomplete tasks, completed-task exclusion, empty matching results, and task changes. Use controlled date inputs in tests once the unresolved calendar policy is approved.
+  - Story: See only incomplete tasks in Overdue
+    - Acceptance Criteria:
+      - Given an incomplete task qualifies for Overdue, when the user selects Overdue, then that task is shown.
+      - Given a completed task, when the user selects Overdue, then that task is not shown.
+      - Given no incomplete tasks qualify for Overdue, when the user selects Overdue, then no tasks are shown in that view.
+    - Technical Requirements:
+      - Frontend: Add an Overdue selector over the shared collection and reuse TaskList rendering. Share the overdue-classification contract with Post-MVP highlighting and sorting so these features cannot disagree about the same task.
+      - Business rules and decisions: The Overdue view must exclude completed tasks. Date boundaries, timezone handling, and undated-task membership remain unresolved. Whether completion also affects overdue classification outside this view is not specified and needs confirmation for Post-MVP consumers.
+      - Data and persistence: Use normalized date and completion values; reevaluate view membership after task changes without altering the underlying collection or completion state.
+      - Backend and API: No backend or HTTP changes; do not add an Overdue endpoint or rely on existing SQL ordering to define membership.
+      - Errors: Reuse the existing empty-list presentation when no incomplete tasks qualify. Treat invalid dates as absent, without inventing an undated-task filter rule; storage failures must remain identifiable as errors.
+      - Security, integrations, and observability: No notification service, external date integration, new authorization flow, overdue analytics, or audit trail is required.
+      - Verification: Cover qualifying incomplete tasks, exclusion of completed tasks, empty matching results, and membership changes. Add boundary and undated-date tests only after the unresolved rules are agreed.
+- Epic: Local Task Storage
+  - Story: Keep task data stored locally
+    - Acceptance Criteria:
+      - Given an otherwise valid task has a title, completion status, priority, and an optional due date, when its data is stored, then that data is stored locally.
+      - Given task data is stored, when the storage location is checked, then no external storage is used for that data.
+    - Technical Requirements:
+      - Current architecture: App performs inline POST/PUT calls; TaskList independently performs GET/PATCH/DELETE calls. There is no shared API client or frontend persistence layer. The Express backend has inline handlers, direct in-memory SQLite access, and no separate controllers, services, repositories, authentication flows, or external integrations. Axios is installed but not used by these task flows.
+      - Frontend approach: Introduce one shared local task-data boundary for load, create, edit, completion changes, and delete; wire the existing App, TaskForm, and TaskList callbacks to it so all task operations use the same authoritative local collection. Reuse React hooks and existing MUI components rather than introducing a router or global state framework.
+      - Local contracts and model: Define operation inputs, returned task data, identity handling, and success/failure outcomes. Store title, completion status, priority, and optional dueDate, and preserve existing identity and unrelated fields such as description and created_at when retaining existing records. Centralize title checks, date normalization, priority validation/defaulting, and non-destructive updates.
+      - Persistence decisions: Local-only storage is mandatory, but the PRD does not choose a browser storage technology, retention lifetime, key/schema format, migration policy, or source for existing data. Confirm these before implementation and estimation is finalized. Do not silently import backend data, add synchronization, or promise a retention policy not approved in the PRD.
+      - Backend and API: No backend code, database schema, or HTTP contract changes. Existing endpoints and SQLite behavior remain unchanged; the local-only task flow must not depend on them for reads or writes. There is no new public API contract, only the shared frontend task-data contract.
+      - Errors: Engineering safeguards for the selected mechanism must cover unavailable storage, read/write failures, and malformed stored data. Reuse visible error presentation, retain user input and the last valid state on failed writes, and avoid silently replacing unreadable data with a successfully saved empty collection. The recovery policy for corrupt records requires confirmation.
+      - Security and authorization: Treat locally stored data as untrusted and validate it before use; retain React text rendering. No accounts, credentials, user ownership model, or authorization layer exists or is required. Local storage is not an access-control boundary; do not claim multi-user isolation or encryption guarantees absent from the PRD.
+      - Integrations and observability: No external storage, synchronization, telemetry, monitoring service, or audit system is required. Existing backend Morgan and console logging remain unchanged. If local diagnostic messages are used, exclude task content and do not transmit it externally.
+      - Verification: Extend the existing Jest/React Testing Library/userEvent suites with a mocked local task boundary. Replace API-backed fixtures only for the changed local frontend flows; retain unrelated MSW patterns and backend Jest/Supertest coverage. Test shared operation consistency, field round trips, validation, failures, and absence of task API or external-storage requests in the local-only flow.
+
+## Post-MVP
+
+- Epic: Overdue Task Visibility
+  - Story: Easily identify visually highlighted overdue tasks
+    - Acceptance Criteria:
+      - Given an overdue task is shown in the task list, when the user views that task, then it is visually highlighted as overdue.
+      - Given overdue and non-overdue tasks are shown together, when the user views the list, then the overdue highlighting visually distinguishes overdue tasks from non-overdue tasks.
+    - Technical Requirements:
+      - Frontend: Extend TaskList's existing conditional MUI item styling using the shared overdue-classification result. Preserve task content, checkbox, edit/delete controls, and existing completed-task styling behavior while providing the required visual distinction.
+      - Business rules and decisions: Reuse the agreed overdue date policy rather than introducing a second comparison rule. Date boundaries, timezone handling, and completion's effect on overdue classification outside the Overdue view require confirmation. Red was suggested, but the final highlight treatment is not specified; do not hard-code it as an approved requirement.
+      - Data and persistence: Derive highlighting from task data and the agreed date context; do not persist an overdue flag that can become stale or change task dates merely to control styling.
+      - Backend and API: No backend changes, new task fields in HTTP responses, or highlighting endpoints are required.
+      - Errors: Invalid dates follow the shared absent-date normalization. Do not invent their overdue classification or conceal storage errors behind ordinary list styling.
+      - Security, integrations, and observability: Continue text rendering and local computation; no notifications, external services, authorization changes, highlight analytics, or audit events are required.
+      - Verification: Use the existing frontend test stack to verify highlighted versus non-highlighted items and unchanged controls. Test the approved date and completed-task cases once those decisions are available, without requiring a color that has not been confirmed.
+- Epic: Task Ordering by Urgency
+  - Story: See tasks ordered by overdue status, P1-to-P3 priority, and earliest due date
+    - Acceptance Criteria:
+      - Given overdue and non-overdue dated tasks, when the task list is sorted, then overdue tasks appear before non-overdue tasks regardless of their priority.
+      - Given dated tasks with the same overdue status and priorities P1, P2, and P3, when the task list is sorted, then P1 tasks appear before P2 tasks and P2 tasks before P3 tasks.
+      - Given dated tasks with the same overdue status but different priorities and due dates, when the task list is sorted, then priority takes precedence over due date.
+      - Given dated tasks with the same overdue status and priority but different due dates, when the task list is sorted, then earlier due dates appear before later due dates.
+    - Technical Requirements:
+      - Frontend: Apply a reusable ordering rule to the displayed local collection before TaskList renders it. Use the same task-state and callback patterns as the views; do not rely on the backend's existing due-date/creation-date order, which does not implement priority or overdue precedence.
+      - Business rules: Within dated tasks, order overdue before non-overdue, then P1 before P2 before P3 within the same overdue group, then due date ascending within the same group and priority. Coordinate with the undated-last story so undated tasks are placed after every dated task.
+      - Data and contracts: Consume validated priorities and date-only values and share overdue classification with the filter/highlight stories. Sort a derived collection without mutating stored task order or identity. No additional persisted sort rank or overdue flag is required.
+      - Decisions: Calendar boundaries, timezone rules, and completion's effect on overdue classification outside the filter remain unresolved. No extra business tie-breaker is specified for otherwise equal tasks; preserve their input order rather than inventing a new precedence rule.
+      - Backend and API: No SQL ordering changes, sort query parameters, or HTTP contract extensions. Sorting is part of the local frontend flow and remains Post-MVP.
+      - Errors, security, and integrations: Normalize invalid dates as absent and use the agreed priority recovery policy instead of silently assigning an unsupported rank. No remote sorting service or authorization extension is required; shared load errors must remain visible.
+      - Observability: No new sorting logs, performance target, monitoring integration, or audit trail is documented.
+      - Verification: Add focused Jest ordering tests for overdue-versus-priority conflicts, priority-versus-date conflicts, ascending dates within equal groups, non-mutation, and ties. Add integration coverage showing the ordered collection through the existing list component.
+  - Story: See tasks without due dates last
+    - Acceptance Criteria:
+      - Given dated and undated tasks, when the task list is sorted, then every undated task appears after every dated task.
+      - Given an undated P1 task and a dated P3 task, when the task list is sorted, then the undated task appears after the dated task despite its higher priority.
+      - Given a task whose invalid due date has been treated as absent and a task with a valid due date, when the task list is sorted, then the task with the absent due date appears after the dated task.
+    - Technical Requirements:
+      - Frontend: Extend the same ordering rule used by the urgency story rather than adding a second independent sort pass with conflicting precedence.
+      - Business rules and validation: Partition valid dated tasks before absent-date tasks regardless of priority. Use the shared absent-date representation and date validator so omitted dates and invalid dates normalized to absent receive the same undated-last treatment.
+      - Data and decisions: Keep undated tasks in the underlying collection and preserve their identity and priority. The PRD does not specify a complete ordering among undated tasks; confirm that rule rather than assuming priority, creation time, or another tie-breaker applies within that group.
+      - Backend and API: No backend, database, or HTTP changes. The existing SQL puts null dates last, but this frontend rule must also cover the canonical local absent-date representation without relying on a server request.
+      - Errors: Invalid dates must not cause sort failures or rejection of otherwise valid tasks. Reuse the shared storage-error handling rather than dropping undated tasks to hide data-access errors.
+      - Security, integrations, and observability: No new authorization, external service, undated-task logging, monitoring target, or audit requirement applies.
+      - Verification: Cover mixed dated/undated collections, undated P1 versus dated P3, invalid-date normalization, and collections with only undated tasks. Assert that no task is lost and that the stored collection is not mutated; do not assert an unapproved order among undated tasks.
