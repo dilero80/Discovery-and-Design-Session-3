@@ -1,0 +1,68 @@
+00:00.000 --> 00:10.000
+Consultant: Thanks for joining today. The goal is to clarify what enhancements you want for the Todo app. Right now, it’s just title and completed, correct?
+
+00:10.000 --> 00:18.000
+Client 1: Yes, super basic. We want to make it more useful without going overboard.
+
+00:18.000 --> 00:28.000
+Consultant: Got it. What’s top of mind? Is it about organizing tasks better, or more about deadlines?
+
+00:28.000 --> 00:38.000
+Client 2: Deadlines for sure. We need a way to set a due date so people know what’s urgent.
+
+00:38.000 --> 00:49.000
+Consultant: Okay, so each task should have an optional due date. How should overdue tasks look? Just a label, or something more visual?
+
+00:49.000 --> 00:59.000
+Client 1: Something visual. Maybe highlight overdue tasks in red so they stand out.
+
+00:59.000 --> 01:08.000
+Consultant: Perfect. And do you want any filtering based on dates? Like “Today” or “Overdue”?
+
+01:08.000 --> 01:18.000
+Client 2: Yes, definitely. Tabs would be nice: All, Today, Overdue. That way it’s quick to switch views.
+
+01:18.000 --> 01:29.000
+Consultant: Great. Now, what about prioritization? Do you need that, or is due date enough?
+
+01:29.000 --> 01:39.000
+Client 1: We do need priority. Just something simple like High, Medium, Low-or maybe P1, P2, P3.
+
+01:39.000 --> 01:49.000
+Consultant: Got it. So three levels: P1, P2, P3. Should we show them visually? Like color-coded badges?
+
+01:49.000 --> 01:59.000
+Client 2: Yes, color badges would be perfect. Red for P1, orange for P2, gray for P3.
+
+01:59.000 --> 02:10.000
+Consultant: Sounds good. Let’s talk sorting. If you have overdue tasks and priorities, what comes first?
+
+02:10.000 --> 02:21.000
+Client 1: Overdue first, then by priority, then by due date. Tasks without a due date can go last.
+
+02:21.000 --> 02:32.000
+Consultant: Makes sense. And for filters, should completed tasks still show up?
+
+02:32.000 --> 02:42.000
+Client 2: In All view, yes. But in Today or Overdue, probably not. Those should only show incomplete tasks.
+
+02:42.000 --> 02:52.000
+Consultant: Okay, so filters hide completed tasks except in All. Any accessibility or design considerations?
+
+02:52.000 --> 03:02.000
+Client 1: Honestly, let’s keep it simple. No keyboard navigation or special accessibility features for now.
+
+03:02.000 --> 03:12.000
+Consultant: Got it-out of scope. Anything else out of scope? Notifications, recurring tasks?
+
+03:12.000 --> 03:21.000
+Client 2: Out of scope for now. Keep it simple-just local storage is fine.
+
+03:21.000 --> 03:32.000
+Consultant: Perfect. Let me recap: Add due dates, priority levels with color coding, filters (All, Today, Overdue), overdue highlighting, sorting rules. Did I miss anything?
+
+03:32.000 --> 03:40.000
+Client 1: That’s everything. This will make the app way more practical without being too complex.
+
+03:40.000 -> 04:01.000
+Consultant: Awesome. I’ll document these as user stories and acceptance criteria. Thanks for the clarity!

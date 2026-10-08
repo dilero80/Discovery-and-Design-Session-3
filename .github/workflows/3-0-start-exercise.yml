@@ -1,0 +1,88 @@
+name: Step 3-0 # Start Exercise
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+  issues: write
+
+env:
+  STEP_2_FILE: ".github/steps/3-1-collect-requirements.md"
+
+jobs:
+  start_exercise:
+    if: |
+      !github.event.repository.is_template
+    name: Start Exercise
+    uses: skills/exercise-toolkit/.github/workflows/start-exercise.yml@v0.4.0
+    with:
+      exercise-title: "AI Coding Assistant Enablement Bootcamp Session 3"
+      intro-message: "Welcome to the AI Coding Assistant Enablement Bootcamp - Session 3! 🚀 In this session, you’ll learn how to use Copilot to streamline your development workflow from start to finish. We’ll walk through collecting requirements and generating a Product Requirements Document (PRD), creating epics and stories with acceptance criteria and technical requirements, building architectural documentation, and finally implementing changes from a story using Copilot. Get ready to experience the power of AI-assisted requirements gathering and documentation in a cloud development environment! 💻✨"
+
+  post_next_step_content:
+    name: Post next step content
+    runs-on: ubuntu-latest
+    needs: [start_exercise]
+    env:
+      ISSUE_URL: ${{ needs.start_exercise.outputs.issue-url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Get response templates
+        uses: actions/checkout@v5
+        with:
+          repository: skills/exercise-toolkit
+          path: exercise-toolkit
+          ref: v0.4.0
+
+      - name: Build comment - add step content
+        id: build-comment
+        uses: skills/action-text-variables@v2
+        with:
+          template-file: ${{ env.STEP_2_FILE }}
+          template-vars: |
+            login: ${{ github.actor }}
+            full_repo_name: ${{ github.repository }}
+
+      - name: Create comment - add step content
+        run: |
+          gh issue comment "$ISSUE_URL" \
+            --body "$ISSUE_BODY"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_BODY: ${{ steps.build-comment.outputs.updated-text }}
+
+      - name: Create comment - watching for progress
+        run: |
+          gh issue comment "$ISSUE_URL" \
+            --body-file "exercise-toolkit/markdown-templates/step-feedback/watching-for-progress.md"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Disable all workflows
+        run: |
+          # Find all workflow files and extract their names
+          for workflow_file in .github/workflows/*.yml; do
+            # Extract the workflow name from the file
+            workflow_name=$(grep "^name:" "$workflow_file" | head -1 | sed 's/name: *//' | sed 's/ *#.*//')
+            echo "Extracted workflow name: '$workflow_name' from file: $workflow_file"
+
+            # Skip Step 3-0 (current workflow) to avoid disabling itself
+            if [[ "$workflow_name" != "Step 3-0" ]]; then
+              echo "Disabling workflow: $workflow_name"
+              gh workflow disable "$workflow_name" || echo "Failed to disable $workflow_name or it's already disabled"
+            fi
+          done
+
+      - name: Enable next workflow
+        run: |
+          gh workflow enable "Step 3-1"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

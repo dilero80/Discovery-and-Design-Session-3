@@ -1,0 +1,59 @@
+#Slack Conversation - Excerpt (Sept 17)
+
+**Consultant - 9:11 AM**
+Picking up from the meeting: let’s lock what’s **MVP**, what’s **Post‑MVP**, and what’s **out of scope** for the Todo upgrade.
+
+**Client 1 - 9:12 AM**
+Goal is a simple, teachable MVP. No backend changes.
+
+**Client 2 - 9:12 AM**
+Agreed. Due dates and priorities are must-haves. Filters too.
+
+**Consultant - 9:13 AM**
+Proposing **MVP** (confirm/tweak):
+- Add `dueDate` (ISO `YYYY-MM-DD`, optional)
+- Add `priority` enum: `P1 | P2 | P3` (default `P3`)
+- Filters: **All**, **Today**, **Overdue**
+- Keep storage **local** (no backend / external storage)
+
+**Client 1 - 9:14 AM**
+Yes, that’s the MVP.
+
+**Client 2 - 9:14 AM**
++1. Keep it lean.
+
+**Consultant - 9:15 AM**
+For clarity, let’s park some items to **Post‑MVP**:
+- Overdue tasks **visually highlighted**
+- Sorting: **overdue first → priority (P1→P3) → due date asc → undated last**
+
+Good for Post‑MVP?
+
+**Client 1 - 9:15 AM**
+Approved as Post‑MVP.
+
+**Client 2 - 9:16 AM**
+Works for me.
+
+**Consultant - 9:16 AM**
+And confirm **Out of scope**:
+- notifications
+- recurring tasks
+- multi-user
+- keyboard nav
+- external storage (we’ll stay local only)
+
+**Client 1 - 9:17 AM**
+Confirmed.
+
+**Client 2 - 9:17 AM**
+Confirmed.
+
+**Consultant - 9:18 AM**
+Data model & validation for **MVP**:
+- `title`: required
+- `priority`: `"P1" | "P2" | "P3"`, default `"P3"`
+- `dueDate`: optional ISO `YYYY-MM-DD`; invalid values should be ignored (treated as absent)
+
+**Client 1 - 9:18 AM**
+Sounds good.
